@@ -140,15 +140,16 @@ api() { LD_LIBRARY_PATH=/data/local/tmp/node-lib OPENSSL_CONF=/data/local/tmp/no
 {"id":"artist","component":"Text","text":"【歌手】","variant":"body","color":"#64748B"},
 {"id":"btn_row","component":"Row","children":["btn_prev","btn_play","btn_next"],"justify":"spaceEvenly","align":"center","padding":"16px 0 0 0"},
 {"id":"btn_prev","component":"Button","child":"prev_icon","variant":"borderless","action":{"event":{"name":"music_prev"}}},
-{"id":"prev_icon","component":"Icon","name":"skipPrevious","color":"#6D28D9"},
+{"id":"prev_icon","component":"Icon","name":"skipPrevious","color":"#6D28D9","styles":{"width":"48px","height":"48px"}},
 {"id":"btn_play","component":"Button","child":"play_icon","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"14px 30px"}},
-{"id":"play_icon","component":"Icon","name":"play","color":"#FFFFFF"},
+{"id":"play_icon","component":"Icon","name":"play","color":"#FFFFFF","styles":{"width":"40px","height":"40px"}},
 {"id":"btn_next","component":"Button","child":"next_icon","variant":"borderless","action":{"event":{"name":"music_next"}}},
-{"id":"next_icon","component":"Icon","name":"skipNext","color":"#6D28D9"}
+{"id":"next_icon","component":"Icon","name":"skipNext","color":"#6D28D9","styles":{"width":"48px","height":"48px"}}
 ]}}
 ```
 
 要点：
 - 按钮用 **Icon 子组件**（name: skipPrevious/play/skipNext），媒体图标已加进 SDK。`play_icon` 的 id 固定（app 翻转 play↔pause 靠它）。
+- Icon 默认尺寸会被 Yoga 压很小，**必须显式给 `styles.width/height`**（prev/next 48px、play 40px 实测合适；`size` prop 无效被布局覆盖）。
 - `btn_play` 紫色胶囊靠 `styles.background-color:#8B5CF6` + `border-radius:999px`（`variant:primary` 本身灰底，必须显式 background-color 才紫）。
 - 不加 Slider/进度条/时间/封面。
