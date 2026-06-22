@@ -1,0 +1,26 @@
+# Submodules handled separately
+AGenUI/
+
+# Large binary toolkits / SDKs
+mtk/
+
+# Historical backups
+backup/
+backups/
+
+# BYD map APK + decompiled (539M + 184M, regeneratable)
+docs/byd_map.apk
+docs/byd_map_decompiled/
+
+# tts-adapter: caches, backups, private voice samples
+tts-adapter/__pycache__/
+tts-adapter/*.bak
+tts-adapter/voice_samples/
+
+# IDE / OS
+.claude/
+*.DS_Store
+Thumbs.db
+sample.png
+.~lock.*
+*.lock

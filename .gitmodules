@@ -1,0 +1,3 @@
+[submodule "agent_front_app"]
+	path = agent_front_app
+	url = git@github.com:heytan/openclaw_test.git

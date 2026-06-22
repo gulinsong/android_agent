@@ -1,0 +1,68 @@
+{
+  "lively": {
+    "description": "活泼女声",
+    "ref_audio": "voice_samples/活泼女声.wav",
+    "prompt_text": "活泼女声，明亮欢快",
+    "cfg_value": 2.5,
+    "temperature": 0.5
+  },
+  "bright": {
+    "description": "明亮女声",
+    "ref_audio": "voice_samples/明亮女声.wav",
+    "prompt_text": "明亮女声，清脆悦耳",
+    "cfg_value": 2.5,
+    "temperature": 0.5
+  },
+  "deep": {
+    "description": "磁性男声",
+    "ref_audio": "voice_samples/磁性男声.wav",
+    "prompt_text": "磁性男声，低沉浑厚",
+    "cfg_value": 2.5,
+    "temperature": 0.5
+  },
+  "user_clone": {
+    "description": "我的音色",
+    "ref_audio": "voice_samples/user_clone.wav",
+    "prompt_text": "",
+    "cfg_value": 1.5,
+    "temperature": 0.3,
+    "auto_ref": false
+  },
+  "leehom": {
+    "description": "王力宏",
+    "ref_audio": "voice_samples/王力宏.wav",
+    "prompt_text": "自然男声，温和有磁性",
+    "cfg_value": 3.0,
+    "temperature": 0.8,
+    "auto_ref": false
+  },
+  "yuanyuan": {
+    "description": "高圆圆",
+    "ref_audio": "voice_samples/高圆圆.wav",
+    "prompt_text": "温柔女声，自然亲切",
+    "cfg_value": 3.0,
+    "temperature": 0.8,
+    "auto_ref": false
+  },
+  "xiaohe": {
+    "description": "小何",
+    "ref_audio": "voice_samples/小何.wav",
+    "prompt_text": "",
+    "cfg_value": 1.5,
+    "temperature": 0.3,
+    "auto_ref": false
+  },
+  "custom": {
+    "description": "自定义音色",
+    "prompt_text": "",
+    "ref_audio": "voice_samples/custom_ref.wav",
+    "auto_ref": false
+  },
+  "default": {
+    "ref_audio": "voice_samples/小何.wav",
+    "prompt_text": "",
+    "auto_ref": false,
+    "cfg_value": 2.5,
+    "temperature": 0.7
+  }
+}
