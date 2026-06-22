@@ -1,0 +1,15 @@
+{"version":"v0.9","createSurface":{"surfaceId":"music","catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json","theme":{},"sendDataModel":false,"animated":true}}
+{"version":"v0.9","updateComponents":{"surfaceId":"music","components":[
+{"id":"root","component":"Card","child":"main"},
+{"id":"main","component":"Column","children":["label","song","artist","btn_row"],"backgroundColor":"#FFFFFF","borderRadius":"16px","padding":"24px"},
+{"id":"label","component":"Text","text":"正在播放","variant":"caption","color":"#8B5CF6"},
+{"id":"song","component":"Text","text":"双截棍","variant":"h4","color":"#1E293B"},
+{"id":"artist","component":"Text","text":"周杰伦","variant":"body","color":"#64748B"},
+{"id":"btn_row","component":"Row","children":["btn_prev","btn_play","btn_next"],"justify":"spaceEvenly","align":"center","padding":"16px 0 0 0"},
+{"id":"btn_prev","component":"Button","child":"prev_txt","variant":"borderless","action":{"event":{"name":"music_prev"}}},
+{"id":"prev_txt","component":"Text","text":"⏮","variant":"h4","color":"#6D28D9"},
+{"id":"btn_play","component":"Button","child":"play_txt","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"12px 32px"}},
+{"id":"play_txt","component":"Text","text":"▶","color":"#FFFFFF","variant":"h5"},
+{"id":"btn_next","component":"Button","child":"next_txt","variant":"borderless","action":{"event":{"name":"music_next"}}},
+{"id":"next_txt","component":"Text","text":"⏭","variant":"h4","color":"#6D28D9"}
+]}}
