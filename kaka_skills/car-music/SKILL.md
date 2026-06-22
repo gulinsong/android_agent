@@ -119,9 +119,9 @@ api() { LD_LIBRARY_PATH=/data/local/tmp/node-lib OPENSSL_CONF=/data/local/tmp/no
 
 ## 音乐卡片模板（surfaceId=music，/music/search 后必须附）
 
-**静态卡片**：歌名/歌手 + 三个按钮（⏮上一首 / ▶·⏸播放暂停 / ⏭下一首）。按钮用 **Text 渲染 unicode 媒体符号**（车机字体已验证 ▶ ⏸ ⏮ ⏭ 全部能渲染）——不要用 Icon 组件（AGenUI SDK 图标库不含媒体图标，会画 `?`）。没有进度条/时间/封面（dumpsys 拿不到 duration/coverUrl）。
+**静态卡片**：歌名/歌手 + 三个按钮（skipPrevious上一首 / play·pause播放暂停 / skipNext下一首）。按钮用 **Icon 组件**（媒体图标已加进 AGenUI SDK：play/pause/skipPrevious/skipNext）。没有进度条/时间/封面（dumpsys 拿不到 duration/coverUrl）。
 
-紫色调 #8B5CF6。骨架：**必须以 `{"id":"root","component":"Card","child":"main"}` 为首组件**（缺 root 整张卡片空白），下接 Column(label/song/artist/btn_row)。Button 的 `action.event` 已被 app 路由回 `/music/*` API。**LLM 只给初值**：app 端 1Hz 轻量同步会自动把 `song`/`artist` 更新成当前在放的曲目、把 `play_txt` 翻成 ⏸(播放中)/▶(暂停)——LLM 不要自己更新这三个字段。
+紫色调 #8B5CF6。骨架：**必须以 `{"id":"root","component":"Card","child":"main"}` 为首组件**（缺 root 整张卡片空白），下接 Column(label/song/artist/btn_row)。Button 的 `action.event` 已被 app 路由回 `/music/*` API。**LLM 只给初值**：app 端 1Hz 轻量同步会自动把 `song`/`artist` 更新成当前在放的曲目、把 `play_icon` 的 name 翻成 pause(播放中)/play(暂停)——LLM 不要自己更新这三个字段。
 
 | event name | 触发 |
 |---|---|
@@ -139,16 +139,16 @@ api() { LD_LIBRARY_PATH=/data/local/tmp/node-lib OPENSSL_CONF=/data/local/tmp/no
 {"id":"song","component":"Text","text":"【歌名】","variant":"h4","color":"#1E293B"},
 {"id":"artist","component":"Text","text":"【歌手】","variant":"body","color":"#64748B"},
 {"id":"btn_row","component":"Row","children":["btn_prev","btn_play","btn_next"],"justify":"spaceEvenly","align":"center","padding":"16px 0 0 0"},
-{"id":"btn_prev","component":"Button","child":"prev_txt","variant":"borderless","action":{"event":{"name":"music_prev"}}},
-{"id":"prev_txt","component":"Text","text":"⏮","variant":"h4","color":"#6D28D9"},
-{"id":"btn_play","component":"Button","child":"play_txt","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"12px 32px"}},
-{"id":"play_txt","component":"Text","text":"▶","color":"#FFFFFF","variant":"h5"},
-{"id":"btn_next","component":"Button","child":"next_txt","variant":"borderless","action":{"event":{"name":"music_next"}}},
-{"id":"next_txt","component":"Text","text":"⏭","variant":"h4","color":"#6D28D9"}
+{"id":"btn_prev","component":"Button","child":"prev_icon","variant":"borderless","action":{"event":{"name":"music_prev"}}},
+{"id":"prev_icon","component":"Icon","name":"skipPrevious","color":"#6D28D9"},
+{"id":"btn_play","component":"Button","child":"play_icon","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"14px 30px"}},
+{"id":"play_icon","component":"Icon","name":"play","color":"#FFFFFF"},
+{"id":"btn_next","component":"Button","child":"next_icon","variant":"borderless","action":{"event":{"name":"music_next"}}},
+{"id":"next_icon","component":"Icon","name":"skipNext","color":"#6D28D9"}
 ]}}
 ```
 
 要点：
-- 按钮必须是 **Text 子组件**（unicode ⏮▶⏭），不能用 Icon（SDK 无媒体图标→`?`）。`play_txt` 的 id 固定（app 翻转靠它）。
+- 按钮用 **Icon 子组件**（name: skipPrevious/play/skipNext），媒体图标已加进 SDK。`play_icon` 的 id 固定（app 翻转 play↔pause 靠它）。
 - `btn_play` 紫色胶囊靠 `styles.background-color:#8B5CF6` + `border-radius:999px`（`variant:primary` 本身灰底，必须显式 background-color 才紫）。
 - 不加 Slider/进度条/时间/封面。

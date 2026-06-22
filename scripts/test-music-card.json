@@ -6,10 +6,10 @@
 {"id":"song","component":"Text","text":"双截棍","variant":"h4","color":"#1E293B"},
 {"id":"artist","component":"Text","text":"周杰伦","variant":"body","color":"#64748B"},
 {"id":"btn_row","component":"Row","children":["btn_prev","btn_play","btn_next"],"justify":"spaceEvenly","align":"center","padding":"16px 0 0 0"},
-{"id":"btn_prev","component":"Button","child":"prev_txt","variant":"borderless","action":{"event":{"name":"music_prev"}}},
-{"id":"prev_txt","component":"Text","text":"⏮","variant":"h4","color":"#6D28D9"},
-{"id":"btn_play","component":"Button","child":"play_txt","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"12px 32px"}},
-{"id":"play_txt","component":"Text","text":"▶","color":"#FFFFFF","variant":"h5"},
-{"id":"btn_next","component":"Button","child":"next_txt","variant":"borderless","action":{"event":{"name":"music_next"}}},
-{"id":"next_txt","component":"Text","text":"⏭","variant":"h4","color":"#6D28D9"}
+{"id":"btn_prev","component":"Button","child":"prev_icon","variant":"borderless","action":{"event":{"name":"music_prev"}}},
+{"id":"prev_icon","component":"Icon","name":"skipPrevious","color":"#6D28D9"},
+{"id":"btn_play","component":"Button","child":"play_icon","variant":"primary","action":{"event":{"name":"music_play_pause"}},"styles":{"background-color":"#8B5CF6","border-radius":"999px","padding":"14px 30px"}},
+{"id":"play_icon","component":"Icon","name":"play","color":"#FFFFFF"},
+{"id":"btn_next","component":"Button","child":"next_icon","variant":"borderless","action":{"event":{"name":"music_next"}}},
+{"id":"next_icon","component":"Icon","name":"skipNext","color":"#6D28D9"}
 ]}}

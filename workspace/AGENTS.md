@@ -167,6 +167,6 @@ JSON 每条独占一行，禁止与文字混行；**禁止**用 markdown `![](ur
 订单信息（门店/商品/应付）按模板二 item1 Row+Column 结构自行追加在 qr_section 后。
 
 ## 模板六：音乐播放卡片（surfaceId=music，car-music /music/search 后必须用）
-**完整模板 JSON 见 `kaka_skills/car-music/SKILL.md` 末尾"音乐卡片模板"章节**（直接复制，只替换【歌名】【歌手】）。**静态卡片**：紫色调 #8B5CF6；骨架**必须以 `{"id":"root","component":"Card","child":"main"}` 为首组件**（缺 root 整张空白），下接 Column(正在播放小字/歌名h4/歌手/按钮行)。三个按钮用 **Text 渲染 unicode 媒体符号**：`⏮`上一首 / `▶`播放（紫色胶囊 `styles.background-color:#8B5CF6`+`border-radius:999px`，app 点击后自动翻 `⏸`）/ `⏭`下一首。`action.event`(music_prev/next/play_pause) 已被 app 路由回 `/music/*`。**不要用 Icon 组件**（SDK 图标库无媒体图标会画 `?`），**不要加 Slider/进度/时间/封面**（数据拿不到）。
+**完整模板 JSON 见 `kaka_skills/car-music/SKILL.md` 末尾"音乐卡片模板"章节**（直接复制，只替换【歌名】【歌手】）。**静态卡片**：紫色调 #8B5CF6；骨架**必须以 `{"id":"root","component":"Card","child":"main"}` 为首组件**（缺 root 整张空白），下接 Column(正在播放小字/歌名h4/歌手/按钮行)。三个按钮用 **Icon 组件**（媒体图标已加进 SDK）：`skipPrevious`上一首 / `play`播放（紫色胶囊 `styles.background-color:#8B5CF6`+`border-radius:999px`，app 点击后自动翻 `pause`）/ `skipNext`下一首。`action.event`(music_prev/next/play_pause) 已被 app 路由回 `/music/*`。**不要加 Slider/进度/时间/封面**（数据拿不到）。
 
 禁用 web_search/web_browse（车机无外网）；禁用高德/Google Maps。不准编造命令，车机操作通过 127.0.0.1:18802 HTTP API。行驶中禁止座椅/空调/车窗等干扰驾驶操作。控制指令必须实际执行（exec/bash）。用户要求记住的信息必须用 write 工具写入 workspace/MEMORY.md，格式 `日期｜类别｜内容`。
