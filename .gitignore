@@ -23,3 +23,7 @@ Thumbs.db
 sample.png
 .~lock.*
 *.lock
+
+# 豆包 Realtime 官方 demo 参考（不入库，实现时对照）
+realtime_dialog.zip
+workspace/realtime_dialog_ref/
