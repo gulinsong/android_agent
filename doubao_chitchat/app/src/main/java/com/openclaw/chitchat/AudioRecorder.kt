@@ -3,6 +3,8 @@ package com.openclaw.chitchat
 import android.Manifest
 import android.annotation.SuppressLint
 import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -14,6 +16,8 @@ class AudioRecorder(private val scope: CoroutineScope) {
     private var record: AudioRecord? = null
     private var job: Job? = null
     private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
+    private var agc: AutomaticGainControl? = null
     @Volatile private var running = false
 
     @SuppressLint("MissingPermission")
@@ -33,14 +37,25 @@ class AudioRecorder(private val scope: CoroutineScope) {
         val sid = record?.audioSessionId ?: 0
         aec = AcousticEchoCanceler.create(sid)
         if (aec != null && AcousticEchoCanceler.isAvailable()) aec?.enabled = true
-        Log.i("AR", "AEC available=${AcousticEchoCanceler.isAvailable()} enabled=${aec?.enabled}")
+        ns = NoiseSuppressor.create(sid)
+        if (ns != null && NoiseSuppressor.isAvailable()) ns?.enabled = true
+        agc = AutomaticGainControl.create(sid)
+        if (agc != null && AutomaticGainControl.isAvailable()) agc?.enabled = true
+        Log.i("AR", "AEC=${aec?.enabled} NS=${ns?.enabled} AGC=${agc?.enabled}")
         running = true
         record?.startRecording()
         job = scope.launch(Dispatchers.IO) {
             val buf = ByteArray(Config.AUDIO_CHUNK_BYTES)
+            var logCnt = 0
             while (isActive && running) {
                 val n = record?.read(buf, 0, buf.size) ?: -1
-                if (n > 0) onChunk(buf.copyOf(n))
+                if (n > 0) {
+                    val rms = computeRms(buf, n)
+                    // 回声/噪音能量小(RMS<RMS_THRESHOLD)→上传静音包保持时序；真语音才真传
+                    if (rms >= RMS_THRESHOLD) onChunk(buf.copyOf(n))
+                    else onChunk(ByteArray(n))
+                    if (++logCnt % 50 == 0) Log.i("AR", "rms=$rms gated=${rms < RMS_THRESHOLD}")
+                }
                 delay(Config.SEND_INTERVAL_MS)
             }
         }
@@ -51,8 +66,31 @@ class AudioRecorder(private val scope: CoroutineScope) {
         job?.cancel()
         aec?.release()
         aec = null
+        ns?.release()
+        ns = null
+        agc?.release()
+        agc = null
         record?.stop()
         record?.release()
         record = null
+    }
+
+    private fun computeRms(buf: ByteArray, n: Int): Double {
+        var sum = 0L
+        var count = 0
+        var i = 0
+        while (i + 1 < n) {
+            val s = ((buf[i].toInt() and 0xFF) or (buf[i + 1].toInt() shl 8)).toShort().toInt()
+            sum += s.toLong() * s
+            count++
+            i += 2
+        }
+        return if (count > 0) Math.sqrt(sum.toDouble() / count) else 0.0
+    }
+
+    companion object {
+        // 回声/静音 RMS 门限：低于此值上传静音包(保持时序，服务端VAD不触发回声)
+        // 按 AR 日志的 rms 调：回声通常 <500，正常说话 >1500
+        private const val RMS_THRESHOLD = 1500.0
     }
 }
