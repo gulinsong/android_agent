@@ -7,13 +7,10 @@ import android.media.AudioTrack
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 class AudioPlayer(private val scope: CoroutineScope) {
     private var track: AudioTrack? = null
     private var job: Job? = null
-    private val mutex = Mutex()
     @Volatile private var channel: Channel<ByteArray>? = null
     @Volatile private var running = false
 
@@ -22,8 +19,8 @@ class AudioPlayer(private val scope: CoroutineScope) {
         val bufSize = AudioTrack.getMinBufferSize(
             sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
         track = AudioTrack(
-            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build(),
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(),
             AudioFormat.Builder().setSampleRate(sampleRate)
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                 .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build(),
@@ -34,9 +31,10 @@ class AudioPlayer(private val scope: CoroutineScope) {
         channel = Channel(capacity = 64)
         running = true
         track?.play()
-        Log.i("AP", "AudioTrack state=${track?.state} playState=${track?.playState} bufSize=$bufSize sr=$sampleRate")
+        Log.i("AP", "AudioTrack state=${track?.state} playState=${track?.playState} sr=$sampleRate")
+        // 单一播放协程，全程不重启（避免多协程并发 write 导致 native SIGSEGV）
         job = scope.launch(Dispatchers.IO) {
-            val ch = channel!!
+            val ch = channel ?: return@launch
             var wrote = 0L
             try {
                 for (pcm in ch) {
@@ -55,25 +53,29 @@ class AudioPlayer(private val scope: CoroutineScope) {
         channel?.trySend(pcm)
     }
 
-    /** 打断：清空排队音频 + 立即静音。ASRInfo(450) 时调用。 */
-    fun interrupt() = runBlocking {
-        mutex.withLock {
-            val old = channel
-            old?.close()
-            channel = Channel(capacity = 64)
-            track?.pause()
-            track?.flush()
-            track?.play()
-        }
+    /** 打断：排空已排队音频 + flush AudioTrack buffer 立即静音。
+     *  不重启协程（单一 job 串行 write，避免并发 write 的 native 崩溃）。
+     *  后续 feed 的新音频由同一 job 继续消费。ASRInfo(450) 时调用。 */
+    fun interrupt() {
+        val ch = channel ?: return
+        var drained = 0
+        while (ch.tryReceive().isSuccess) { drained++ }
+        track?.pause()
+        track?.flush()
+        track?.play()
+        Log.i("AP", "interrupted, drained=$drained")
     }
 
-    fun stop() {
+    /** suspend：先停播放协程(join)再 release track，避免 release 后 write 的 SIGSEGV。 */
+    suspend fun stop() {
         running = false
         channel?.close()
-        job?.cancel()
+        job?.join()
         track?.stop()
         track?.flush()
         track?.release()
         track = null
+        channel = null
+        Log.i("AP", "stopped")
     }
 }

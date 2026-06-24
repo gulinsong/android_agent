@@ -32,4 +32,14 @@
         android:layout_marginTop="24dp"
         android:textColor="#F28B82"
         android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/toggleBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:paddingHorizontal="48dp"
+        android:paddingVertical="14dp"
+        android:text="开始"
+        android:textSize="18sp" />
 </LinearLayout>

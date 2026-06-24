@@ -100,7 +100,8 @@ class CallManager(
     }
 
     override fun onAudio(payload: ByteArray) {
-        Log.i("CM", "onAudio size=${payload.size}")
+        val head = payload.take(8).joinToString(",") { "%02X".format(it.toInt() and 0xFF) }
+        Log.i("CM", "onAudio size=${payload.size} head=$head")
         player?.feed(payload)
     }
 
