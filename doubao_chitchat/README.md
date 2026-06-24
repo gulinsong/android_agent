@@ -4,20 +4,20 @@
 设计与实现文档见 `docs/superpowers/specs/2026-06-24-doubao-realtime-chitchat-design.md`
 与 `docs/superpowers/plans/2026-06-24-doubao-realtime-chitchat.md`。
 
-## 配置鉴权
+## 配置鉴权（实测：新版只需 API Key，无需 App ID）
+握手实测：`X-Api-Key` + `X-Api-Resource-Id`(固定) + `X-Api-App-Key`(固定) 返回 101。
 在 `~/.gradle/gradle.properties` 加（不入库）：
 ```
-doubaoAppId=你的AppID
-doubaoAccessKey=你的AccessKey
+doubaoApiKey=你的API Key
 ```
-构建时通过 `-PdoubaoAppId=... -PdoubaoAccessKey=...` 传入也可。
+构建时通过 `-PdoubaoApiKey=...` 传入也可。
 
 ## 构建/安装（BYD 车机）
 ```
 ./gradlew assembleDebug
 adb -s <车机serial> install -r app/build/outputs/apk/debug/app-debug.apk
-# BYD 多用户录音权限需手动授予
-adb -s <车机serial> shell pm grant com.openclaw.chitchat android.permission.RECORD_AUDIO
+# BYD 多用户：app 跑在 user 10，权限必须 grant 给当前 user（不带 --user 会授权到 user 0 无效）
+adb -s <车机serial> shell pm grant --user $(adb -s <车机serial> shell am get-current-user | tr -d '\r') com.openclaw.chitchat android.permission.RECORD_AUDIO
 ```
 
 ## 单测
