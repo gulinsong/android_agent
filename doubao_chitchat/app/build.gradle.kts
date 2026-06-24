@@ -15,9 +15,8 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 鉴权：从 ~/.gradle/gradle.properties 或 -P 读，不硬编码真实值入库
-        buildConfigField("String", "DOUBAO_APP_ID", "\"${project.findProperty("doubaoAppId") ?: ""}\"")
-        buildConfigField("String", "DOUBAO_ACCESS_KEY", "\"${project.findProperty("doubaoAccessKey") ?: ""}\"")
+        // 鉴权：新版只需 API Key（实测：X-Api-Key + Resource-Id + App-Key，无需 App ID）
+        buildConfigField("String", "DOUBAO_API_KEY", "\"${project.findProperty("doubaoApiKey") ?: ""}\"")
     }
 
     buildFeatures { buildConfig = true }

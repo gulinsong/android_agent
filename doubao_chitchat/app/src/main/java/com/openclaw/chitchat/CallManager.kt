@@ -14,8 +14,7 @@ interface CallUi {
 
 class CallManager(
     private val scope: CoroutineScope,
-    private val appId: String,
-    private val accessKey: String,
+    private val apiKey: String,
     private val ui: CallUi
 ) : RealtimeListener {
     private val gson = Gson()
@@ -35,7 +34,7 @@ class CallManager(
     suspend fun start() {
         setState(CallState.CONNECTING)
         player = AudioPlayer(scope).also { it.start() }
-        client = RealtimeClient(appId, accessKey, sessionId, this)
+        client = RealtimeClient(apiKey, sessionId, this)
         client?.connect()
     }
 

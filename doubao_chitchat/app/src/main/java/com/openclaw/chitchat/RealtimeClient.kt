@@ -12,8 +12,7 @@ interface RealtimeListener {
 }
 
 class RealtimeClient(
-    private val appId: String,
-    private val accessKey: String,
+    private val apiKey: String,
     private val connectId: String,
     private val listener: RealtimeListener
 ) {
@@ -22,7 +21,7 @@ class RealtimeClient(
 
     fun connect() {
         val request = Request.Builder().url(Config.WS_URL).apply {
-            Config.headers(appId, accessKey, connectId).forEach { (k, v) -> header(k, v) }
+            Config.headers(apiKey, connectId).forEach { (k, v) -> header(k, v) }
         }.build()
         ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) = listener.onOpen()

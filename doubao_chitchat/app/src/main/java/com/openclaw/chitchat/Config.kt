@@ -21,9 +21,8 @@ object Config {
     const val DEFAULT_SPEAKING_STYLE = "说话简洁口语化，语气亲切自然。"
     const val DEFAULT_BOT_NAME = "小闲"
 
-    fun headers(appId: String, accessKey: String, connectId: String): Map<String, String> = mapOf(
-        "X-Api-App-ID" to appId,
-        "X-Api-Access-Key" to accessKey,
+    fun headers(apiKey: String, connectId: String): Map<String, String> = mapOf(
+        "X-Api-Key" to apiKey,
         "X-Api-Resource-Id" to RESOURCE_ID,
         "X-Api-App-Key" to APP_KEY,
         "X-Api-Connect-Id" to connectId

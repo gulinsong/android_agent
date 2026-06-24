@@ -2,6 +2,7 @@ package com.openclaw.chitchat
 
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ConfigPayloadTest {
@@ -16,12 +17,12 @@ class ConfigPayloadTest {
         assertEquals(Config.DEFAULT_SPEAKER, root.getAsJsonObject("tts").get("speaker").asString)
     }
 
-    @Test fun headers_include_auth_keys() {
-        val h = Config.headers("APP123", "KEY456", "cid")
-        assertEquals("APP123", h["X-Api-App-ID"])
-        assertEquals("KEY456", h["X-Api-Access-Key"])
+    @Test fun headers_use_apikey_no_appid() {
+        val h = Config.headers("KEY456", "cid")
+        assertEquals("KEY456", h["X-Api-Key"])
         assertEquals("volc.speech.dialog", h["X-Api-Resource-Id"])
         assertEquals("PlgvMymc7f3tQnJ6", h["X-Api-App-Key"])
         assertEquals("cid", h["X-Api-Connect-Id"])
+        assertNull(h["X-Api-App-ID"]) // 新版鉴权不用 App ID（实测确认）
     }
 }

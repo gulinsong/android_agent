@@ -61,11 +61,11 @@ class ChitchatActivity : AppCompatActivity() {
 
     private fun beginSession() {
         if (manager != null) return
-        if (BuildConfig.DOUBAO_APP_ID.isBlank() || BuildConfig.DOUBAO_ACCESS_KEY.isBlank()) {
-            vm.onError("未配置 DOUBAO_APP_ID/ACCESS_KEY（~/.gradle/gradle.properties）"); return
+        if (BuildConfig.DOUBAO_API_KEY.isBlank()) {
+            vm.onError("未配置 DOUBAO_API_KEY（~/.gradle/gradle.properties）"); return
         }
         requestFocus()
-        manager = CallManager(scope, BuildConfig.DOUBAO_APP_ID, BuildConfig.DOUBAO_ACCESS_KEY, vm)
+        manager = CallManager(scope, BuildConfig.DOUBAO_API_KEY, vm)
         scope.launch { manager?.start() }
     }
 
