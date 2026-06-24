@@ -1,3 +1,6 @@
 [submodule "agent_front_app"]
 	path = agent_front_app
-	url = git@github.com:heytan/openclaw_test.git
+	url = https://github.com/heytan/openclaw_test.git
+[submodule "AGenUI"]
+	path = AGenUI
+	url = https://github.com/gulinsong/AGenUI.git
