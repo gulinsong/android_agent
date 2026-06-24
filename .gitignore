@@ -27,3 +27,6 @@ sample.png
 # 豆包 Realtime 官方 demo 参考（不入库，实现时对照）
 realtime_dialog.zip
 workspace/realtime_dialog_ref/
+
+# Android SDK 本地路径（每台机器不同）
+local.properties
