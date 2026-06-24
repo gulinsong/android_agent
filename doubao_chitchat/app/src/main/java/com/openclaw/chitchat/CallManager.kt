@@ -99,7 +99,10 @@ class CallManager(
         }
     }
 
-    override fun onAudio(payload: ByteArray) { player?.feed(payload) }
+    override fun onAudio(payload: ByteArray) {
+        Log.i("CM", "onAudio size=${payload.size}")
+        player?.feed(payload)
+    }
 
     override fun onError(code: Int, msg: String) {
         ui.onError("错误[$code]: $msg")

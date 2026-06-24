@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -33,12 +34,18 @@ class AudioPlayer(private val scope: CoroutineScope) {
         channel = Channel(capacity = 64)
         running = true
         track?.play()
+        Log.i("AP", "AudioTrack state=${track?.state} playState=${track?.playState} bufSize=$bufSize sr=$sampleRate")
         job = scope.launch(Dispatchers.IO) {
             val ch = channel!!
+            var wrote = 0L
             try {
                 for (pcm in ch) {
                     if (!running) break
-                    if (pcm.size % 2 == 0) track?.write(pcm, 0, pcm.size)
+                    if (pcm.size % 2 == 0) {
+                        track?.write(pcm, 0, pcm.size)
+                        wrote += pcm.size
+                        if (wrote % 48000 < pcm.size) Log.i("AP", "wrote=$wrote playState=${track?.playState}")
+                    }
                 }
             } catch (_: CancellationException) {}
         }
