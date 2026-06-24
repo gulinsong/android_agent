@@ -1,5 +1,6 @@
 package com.openclaw.chitchat
 
+import android.util.Log
 import okhttp3.*
 import okio.ByteString
 
@@ -24,7 +25,10 @@ class RealtimeClient(
             Config.headers(apiKey, connectId).forEach { (k, v) -> header(k, v) }
         }.build()
         ws = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) = listener.onOpen()
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.i("RTC", "WS open, logid=" + response.header("X-Tt-Logid"))
+                listener.onOpen()
+            }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 // 服务端主要走二进制，文本兜底忽略
             }
@@ -45,9 +49,14 @@ class RealtimeClient(
                     listener.onError(-1, "unmarshal failed: ${e.message}")
                 }
             }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) =
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.e("RTC", "WS failure: ${t.message}", t)
                 listener.onClose(-1, "failure: ${t.message}")
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = listener.onClose(code, reason)
+            }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.w("RTC", "WS closed: $code $reason")
+                listener.onClose(code, reason)
+            }
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, null) }
         })
     }

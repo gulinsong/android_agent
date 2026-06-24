@@ -1,5 +1,6 @@
 package com.openclaw.chitchat
 
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.*
@@ -61,6 +62,7 @@ class CallManager(
     }
 
     override fun onEvent(event: Int, sessionId: String?, payload: ByteArray?) {
+        Log.i("CM", "event=$event sid=$sessionId payload=${payload?.toString(Charsets.UTF_8)?.take(80)}")
         scope.launch {
             when (event) {
                 150 -> { // SessionStarted
