@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 聊天气泡（白，缩小） -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,32 h36 a7,7 0 0 1 7,7 v16 a7,7 0 0 1 -7,7 h-20 l-12,10 v-10 h-4 a7,7 0 0 1 -7,-7 v-16 a7,7 0 0 1 7,-7 z" />
+    <!-- 笑脸：两眼 + 笑嘴（绿） -->
+    <path
+        android:fillColor="#26DE81"
+        android:pathData="M46,44 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0 M62,44 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" />
+    <path
+        android:pathData="M48,50 Q54,56 60,50"
+        android:strokeColor="#26DE81"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>
