@@ -902,120 +902,120 @@ pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.
 
 ## 车机重启后完整启动清单
 
-车机重启后，以下服务/配置不会自动恢复，需要手动执行。
+车机+开发机都重启后，以下服务/配置不会自动恢复，需要手动执行。
+
+### 开发机服务（先启动，车机依赖）
+
+```bash
+D=LZBYDUMNB6RW7X5P  # 车机 serial
+
+# 停残留进程
+kill $(pgrep -f "vllm.*VoxCPM2") 2>/dev/null
+kill $(pgrep -f stt-server.py) 2>/dev/null
+kill $(pgrep -f adapter.py) 2>/dev/null
+kill $(pgrep -f resource_tracker) 2>/dev/null
+
+# 1. VoxCPM2 TTS（~30s 加载，必须 conda activate）
+source /home/tsm/miniconda3/etc/profile.d/conda.sh && conda activate voxcpm2
+nohup vllm serve /home/tsm/work/voxcpm/models/VoxCPM2 \
+  --omni --host 0.0.0.0 --port 8000 \
+  > /tmp/voxcpm2.log 2>&1 &
+sleep 35
+
+# 2. STT（等 VoxCPM2 先占显存）
+nohup /home/tsm/miniconda3/envs/stt/bin/python \
+  /home/tsm/work/stt/stt-server.py --host 0.0.0.0 --port 8090 \
+  > /tmp/stt.log 2>&1 &
+sleep 10
+
+# 3. TTS 适配层（秒启动）
+nohup /home/tsm/miniconda3/envs/voxcpm2/bin/python \
+  /home/tsm/work/android_agent/tts-adapter/adapter.py \
+  --voxcpm-url http://127.0.0.1:8000 --port 8091 --host 0.0.0.0 \
+  > /tmp/tts-adapter.log 2>&1 &
+sleep 5
+
+# 验证
+curl -s http://localhost:8000/v1/models | head -c 50  # VoxCPM2
+curl -s http://localhost:8090/v1/models | head -c 50  # STT
+curl -s http://localhost:8091/health                   # TTS adapter
+```
 
 ### 第一步：ADB 连接 & Root
 
 ```bash
-adb connect <device>        # 如果无线连接
-adb root                    # 获取 root 权限
-adb shell whoami            # 验证：应返回 root
+adb devices                 # 确认车机连接
+adb -s $D root              # 获取 root（重启后失效）
+sleep 3                     # adbd 重启需要几秒
+adb -s $D shell id          # 验证：应返回 uid=0(root)
 ```
 
-### 第二步：验证 GPS Monitor（boot script 自动启动）
-
-GPS monitor 从车机 SomeIP 日志解析 GPS 坐标，没跑会导致 UiHttpServer `/location` 接口卡死（进而导致 LLM 调用超时）。
-
-**Magisk boot script (`/data/adb/service.d/openclaw-boot.sh`) 已在 boot 后 ~25s 自动用 `setsid` 拉起 gps-monitor.sh，不要手动 `nohup sh ... &`**——脚本是单实例锁保护的（flock），手动起会被静默挡掉（看到 `[gps-monitor] already running, exit` 就是这个原因）。如果 ps 看不到进程，**首选方案是 reboot 设备**让 boot script 重新拉；万不得已才 `setsid /system/bin/sh /data/local/tmp/gps-monitor.sh </dev/null >/dev/null 2>&1 &`。
+### 第二步：端口转发（adb root 重启后必丢，必须在 root 之后）
 
 ```bash
-# 验证（应该见到 1 行，PID 旁边的 ARGS 显示 sh .../gps-monitor.sh）
-adb shell "ps -A -o PID,ARGS | grep -E 'monitor\\.sh|music-cmd' | grep -v grep"
-# 应返回 3 行：music-cmd / music-monitor / gps-monitor 各 1 份
-adb shell "cat /data/local/tmp/gps.json"
-# 应返回 {"ok":true,"lat":"...","lng":"..."}
+adb -s $D forward tcp:18801 tcp:18801   # Gateway (浏览器 dashboard)
+adb -s $D forward tcp:18802 tcp:18802   # UiHttpServer (/location, /health)
 ```
 
-### 第三步：验证音乐控制 Daemons（boot script 自动启动）
-
-音乐控制依赖两个 root daemon：`music-cmd.sh`（执行 keyevent）和 `music-monitor.sh`（每 3s 刷新播放状态写 music-state.json）。Magisk boot script 同样自动启动，验证方法同第二步（一条 ps 命令同时看 3 个脚本）。
+### 第三步：悬浮球权限 + 录音权限
 
 ```bash
-# 验证 state 文件新鲜度（mtime 应该 <5s 前）
-adb shell "stat -c '%Y %n' /data/local/tmp/music-state.json /data/local/tmp/gps.json; date +%s"
-adb shell "cat /data/local/tmp/music-state.json"
-# 应返回 {"ok":true,"state":"playing/paused","title":"...","artist":"..."}
+adb -s $D shell "appops set com.openclaw.car SYSTEM_ALERT_WINDOW allow"
+adb -s $D shell "pm grant --user 10 com.openclaw.car android.permission.RECORD_AUDIO"
 ```
 
-### 第四步：悬浮球权限
+### 第四步：验证 daemon（boot script 自动启动）
+
+Magisk boot script (`/data/adb/service.d/openclaw-boot.sh`) 在 boot 后 ~25s 自动用 `setsid` 拉起
+music-cmd.sh / music-monitor.sh / gps-monitor.sh。**不要手动 nohup**（flock 单实例锁会挡掉）。
 
 ```bash
-adb shell "appops set com.openclaw.car SYSTEM_ALERT_WINDOW allow"
-# 验证
-adb shell "appops get com.openclaw.car SYSTEM_ALERT_WINDOW"
-# 应返回 allow
+adb -s $D shell 'ps -A -o PID,ARGS | grep -E "monitor\.sh|music-cmd" | grep -v grep'
+# 应返回 3+ 行（music-cmd / music-monitor / gps-monitor 各 1 份，可能有 subshell 镜像）
+# 没有就 reboot 设备让 boot script 重新拉
 ```
 
-### 第五步：启动车机 App
+### 第五步：清 Gateway Session（防 trajectory 累积 → overflow/timeout/hallucinate）
 
-车机 App 启动后会自动启动 OpenClaw Gateway。
+**关键：先删后 kill，不能反过来**——app 秒 respawn gateway，先 kill 再删会被新 gateway 把内存里的旧 session 写回。
 
 ```bash
-adb shell "am start -n com.openclaw.car/.MainActivity"
-# 等待 ~10s 让 gateway 启动
-sleep 10
-# 验证
-adb shell "netstat -tlnp 2>/dev/null | grep 18801"
-# 应看到 LISTEN
+# 1. 先删 session 文件（gateway 还活着，文件被删但内存里的 session 下次 flush 才写回）
+adb -s $D shell 'cd /data/local/tmp/openclaw-home/.openclaw/agents/main/sessions && rm -f *.jsonl *.trajectory.jsonl *.trajectory-path.json && echo "[]" > sessions.json'
+
+# 2. kill gateway
+adb -s $D shell 'echo "pkill -f openclaw" > /data/local/tmp/kg.sh && sh /data/local/tmp/kg.sh; sleep 2'
+
+# 3. 再删一次（确保 respawn 前干净）
+adb -s $D shell 'cd /data/local/tmp/openclaw-home/.openclaw/agents/main/sessions && rm -f *.jsonl *.trajectory.jsonl *.trajectory-path.json && echo "[]" > sessions.json'
+
+# 4. 等 app 自动 respawn gateway（~6s）
+sleep 6
 ```
 
-### 第六步：ADB 端口转发
+### 第六步：恢复 port forward（adb root / pkill gateway 后可能丢）
 
 ```bash
-adb forward tcp:18801 tcp:18801   # Gateway (浏览器 dashboard)
-adb forward tcp:18802 tcp:18802   # UiHttpServer (/location, /health)
-# 验证
-curl -s http://localhost:18801/v1/models -H "Authorization: Bearer fe3936a8d8dafeec8efb6d801863eb00c4c08298555a4817"
-curl -s http://localhost:18802/health
-curl -s --max-time 5 http://localhost:18802/location
+adb -s $D forward tcp:18801 tcp:18801
+adb -s $D forward tcp:18802 tcp:18802
 ```
 
-### 第七步：开发机服务 (STT + TTS)
+### 第七步：logcat buffer 扩容
 
 ```bash
-conda activate voxcpm2
-
-# 1. VoxCPM2 TTS（~30s 加载）
-nohup vllm serve /home/tsm/work/voxcpm/models/VoxCPM2 \
-  --omni --host 0.0.0.0 --port 8000 \
-  > /tmp/voxcpm2.log 2>&1 &
-
-# 2. STT（等 VoxCPM2 先占显存）
-sleep 5
-nohup /home/tsm/miniconda3/envs/stt/bin/python \
-  /home/tsm/work/stt/stt-server.py --host 0.0.0.0 --port 8090 \
-  > /tmp/stt.log 2>&1 &
-
-# 3. TTS 适配层（等 VoxCPM2 就绪）
-sleep 30
-nohup python /home/tsm/work/android_agent/tts-adapter/adapter.py \
-  --voxcpm-url http://127.0.0.1:8000 --port 8091 --host 0.0.0.0 \
-  > /tmp/tts-adapter.log 2>&1 &
+adb -s $D logcat -G 4M    # 默认 256KB 太小，关键日志被冲掉
 ```
 
 ### 第八步：诊断验证
 
 ```bash
-echo "=== 车机 Gateway ==="
-curl -s --max-time 5 http://localhost:18801/health
-
-echo "=== 车机 UiHttpServer ==="
-curl -s --max-time 5 http://localhost:18802/health
-
-echo "=== 车机音乐控制 ==="
-curl -s --max-time 5 -X POST http://localhost:18802/music/state -H "Content-Type: application/json" -d '{}'
-
-echo "=== 车机 GPS ==="
-curl -s --max-time 5 http://localhost:18802/location
-
-echo "=== 开发机 STT ==="
-curl -s --max-time 5 http://localhost:8090/v1/models
-
-echo "=== 开发机 VoxCPM2 ==="
-curl -s --max-time 5 http://localhost:8000/v1/models
-
-echo "=== 开发机 TTS Adapter ==="
-curl -s --max-time 5 http://localhost:8091/health
+echo -n "Gateway (18801): "; curl -s -m 5 http://localhost:18801/ | head -c 30
+echo -n "UiHttpServer (18802): "; curl -s -m 5 http://localhost:18802/health
+echo -n "音乐状态: "; curl -s -m 5 -X POST http://localhost:18802/music/state -H "Content-Type: application/json" -d '{}' | head -c 80
+echo -n "STT (8090): "; curl -s -m 5 http://localhost:8090/v1/models | head -c 50
+echo -n "VoxCPM2 (8000): "; curl -s -m 5 http://localhost:8000/v1/models | head -c 50
+echo -n "TTS Adapter (8091): "; curl -s -m 5 http://localhost:8091/health
+nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader
 ```
 
 全部返回正常即可。飞书发一条消息测试端到端链路。
