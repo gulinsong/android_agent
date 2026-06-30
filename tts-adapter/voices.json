@@ -59,10 +59,10 @@
     "auto_ref": false
   },
   "default": {
-    "ref_audio": "voice_samples/小何.wav",
+    "ref_audio": "voice_samples/user_clone.wav",
     "prompt_text": "",
     "auto_ref": false,
-    "cfg_value": 2.5,
-    "temperature": 0.7
+    "cfg_value": 3,
+    "temperature": 0.8
   }
 }
