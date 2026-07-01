@@ -59,8 +59,8 @@
     "auto_ref": false
   },
   "default": {
-    "ref_audio": "voice_samples/user_clone.wav",
-    "prompt_text": "",
+    "ref_audio": "voice_samples/高圆圆.wav",
+    "prompt_text": "温柔女声，自然亲切",
     "auto_ref": false,
     "cfg_value": 3,
     "temperature": 0.8
