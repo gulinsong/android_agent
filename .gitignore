@@ -23,6 +23,10 @@ tts-adapter/voxcpm2_ptq/lm_model/embedding_fp16.bin
 tts-adapter/voxcpm2_ptq/lm_model/tokenizer*.json
 tts-adapter/voxcpm2_ptq/lm_model/special_tokens_map.json
 tts-adapter/voxcpm2_ptq/logs/
+tts-adapter/voxcpm2_ptq/dit/*.pt
+tts-adapter/voxcpm2_ptq/dit/*.onnx
+tts-adapter/voxcpm2_ptq/dit/*.onnx.data
+tts-adapter/voxcpm2_ptq/dit/*.tflite
 tflite/
 calibration_datasets/
 
