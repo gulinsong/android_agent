@@ -72,7 +72,13 @@ for i in range(max_len):                      # 音频 patch 数（音频长度 
 
 ### VAE decoder 大坑
 
-`audiovae.pth`（312 keys）用 `weight_norm(Conv1d)` + `CausalConv1d`（自定义 padding）+ `Snake1d` 激活（`x+(α+ε)⁻¹·sin(αx)²`）+ 残差单元 + chunk 处理。和 face 标准 CNN（Conv2d+ReLU）完全不同，转换需 fuse weight norm + 处理 snake/causal/chunk，大调试。**可能需 onnxruntime-android 替代（不上 MDLA）**。
+`audiovae.pth`（312 keys）用 `weight_norm(Conv1d)` + `CausalConv1d`（自定义 padding）+ `Snake1d` 激活（`x+(α+ε)⁻¹·sin(αx)²`）+ 残差单元 + chunk 处理。
+
+**decode 协议**（`audio_vae_v2.py:452`）：`decode(z:[B,D,T], sr_cond) → decoder(z, sr_cond) → 音频[B,1,length]`。sr_cond 是采样率条件（int tensor，决定输出 20k/30k/40k/48k Hz，AudioVAE V2 内置超分）。有 `streaming_decode`（chunk + stateful causal-conv state，端侧流式用）。
+
+**转换挑战（6 重，2026-07-03 评估）**：①weight_norm fuse（AudioVAEV2 无 `remove_weight_norm` 方法，需手动遍历 remove）②CausalConv1d（F.pad 自定义）③**Snake1d 含 sin/reciprocal/pow**（mtk MDLA 对 sin 支持存疑，face Node81 先例）④**nn.Embedding**（`scale_embed`/`bias_embed`/`cond_embed` 处理 sr_cond，index lookup 可能遇 aten::index）⑤sr_cond 条件分支 ⑥streaming stateful。和 face 标准 CNN 完全不同，**不像 transformer 能 patch 复用**。
+
+**建议**：先试 float（fuse weight norm + trace decoder），看 mtk 能否处理 snake/causal/sr_cond。若 snake sin 卡 → **onnxruntime-android**（CPU 跑 VAE 不上 MDLA）或车机 CPU float。
 
 ### clone vs 非 clone
 
@@ -417,10 +423,68 @@ converter.append_output_dequantize_ops = True
 - MiniCPM PTQ 模板：`mtk/GAI-Deployment-Toolkit-v2.0.6_minicpm-1b-2b-v0.1/post_training_quantize/`
 - mtk_quantization wheel：`mtk/neuropilot-sdk-basic-8.0.11-build20260211/offline_tool/`
 
-## 七、下一步
+## AOT 验证发现（2026-07-03，ncc-tflite 编译检查，PC 不需车机）
 
-1. **DiT float 车机测速**：NnApiDelegate(mtk-mdla_shim, fp16) 跑单步 DiT，估算 10步 Euler × 2 CFG 总耗时
-2. **主LM PC 替换验证**（路径 B）：nanovllm 把主LM 换量化版，跑完整 TTS 听音频，判量化损伤
-3. **DiT PTQ**（若 float 慢）：造校准数据（hook estimator 输入）+ 8w16a
-4. **Encoder/VAE 转换**：复用 PyTorchConverter + patch 经验
-5. **Android 集成**：Euler 循环 + CFG + NnApiDelegate（复用 FaceEngine.applyAccel）
+`ncc-tflite`（host PC x86）能 AOT 编译 tflite→dla，编译时检查 MDLA op 兼容性（失败指出哪个 op）。两条关键发现，**改变了车机验证路径**：
+
+### 发现 1：MDLA 不支持 Float32
+
+`dit_float.tflite` 编译失败：每个 op `MDLA: Cannot support Float32 input/output`。MDLA 只吃 int8/int16（量化）——这正是 face 当年必须 `setAllowFp16(true)` 的原因（fp16 勉强，fp32 完全不行）。
+
+→ **DiT/feat_encoder 的 float tflite 不能上 MDLA**，必须 PTQ 量化（int8/16）。
+
+### 发现 2：mtk_llm_sdk tflite 是 JIT 结构（不适合 AOT）
+
+主LM 量化 chunk（sym4W_sym16A）AOT 编译失败：`MTKEXT_TILE Output shape should be equal to input * multiples` + `CONCATENATION axis dimension mismatch`。mtk_llm_sdk 产出的 tflite 含 Tile/Concat 动态结构（KV cache 处理），是 **JIT（app InterpreterApi）设计**，ncc-tflite AOT 编译不了。
+
+→ 主LM 需 JIT app（face 模式 NnApiDelegate），**不能 AOT 命令行验证**。
+
+### 发现 3（2026-07-03 补）：即使 8w16a 量化，transformer op MDLA 仍不支持
+
+PTQ 量化 DiT（`dit_quant8w16a.tflite` 219MB，8w16a，848MB→219MB ~4x 压缩）AOT 编译**仍失败**：
+- `MTKEXT_RMS_NORMALIZATION` / `MTKEXT_SILU` / `TRANSPOSE`：`MDLA: Cannot support Float32 input/output` + `MVPU: RMSNormLayerNIR Converter Fail`
+- mtk_converter 只量化 FC 权重，RMSNorm/SiLU/Transpose 中间激活保持 float32
+- MDLA + MVPU + EDPA 三个加速器都不支持这些 op 的 float32
+
+→ **transformer 的 RMSNorm/SiLU 是 MDLA 短板**（face CNN 没 these op 才顺）。**AOT 命令行路径对 DiT transformer 卡死**，即使量化。
+
+### MDLA 验证路径（修订 v2）
+
+| 组件 | AOT 命令行 | 实际可行 |
+|---|---|---|
+| DiT / feat_encoder | ❌ 卡（RMSNorm/SiLU float32 op MDLA 不支持） | **JIT 独立小 app + NnApiDelegate fp16**（face 模式，运行时容许 float op）；或 op 改写（RMSNorm→标准 int op）；或 CPU |
+| 主LM | ❌ 卡（Tile/Concat JIT 结构） | 同上，JIT 小 app |
+
+**结论**：AOT `ncc-tflite+neuronrt` 命令行路径对 VoxCPM2 transformer **整体不可行**（MDLA 对 RMSNorm/SiLU 支持差 + mtk_llm_sdk JIT 结构）。必须走 **JIT app**（NnApiDelegate 运行时编译，face 验证过的 fp16 容许模式）。所谓"小服务"= 独立小 app（不碰主 agent_front_app，复用 neuropilot.aar）。
+
+---
+
+## 七、下一步（修订：AOT 发现后）
+
+1. **PTQ 量化 DiT**（8w16a）：造校准数据（hook estimator 输入 latent+timestep+mu+cond，跑 VoxCPM2.generate 采样）+ mtk_converter PTQ。然后 AOT `ncc-tflite dit_quant.tflite -o dit.dla` + `neuronrt dit.dla --device hw` 测速。**命令行验证，不碰 app**。
+2. **feat_encoder 同样 PTQ + AOT**（复用校准流程）
+3. **主LM**：JIT 独立小 app 验证（NnApiDelegate mtk-mdla_shim fp16，复用 neuropilot.aar；不碰主 app）
+4. **VAE**：onnxruntime-android CPU（跳过 MDLA 6 重坑）
+
+---
+
+## JIT 验证 app（TtsMdlabenchmark，2026-07-03）
+
+AOT 命令行对 transformer 死路（发现 1-3），改走 **JIT 独立 androidTest**（不碰 main 代码，复用 app 的 neuropilot.aar）。face 当年也是 JIT（NnApiDelegate 运行时编译），不是 AOT。
+
+**代码**：`agent_front_app/app/src/androidTest/java/com/openclaw/car/tts/TtsMdlabenchmark.kt`
+- mmap 加载 tflite（848MB 避免 OOM，face loadAssetFile 读 bytes 对 174MB 都险）
+- NnApiDelegate `mtk-mdla_shim` + fp16 + setUseNnapiCpu(false)（face applyAccel 模式，失败回退 Neuron/CPU）
+- 喂随机输入（DiT 5 输入 x/mu/t/cond/dt）+ runForMultipleInputsOutputs + 计时
+- log tag `TtsBench`，create/run 失败有明确报错（MDLA JIT 也不支持则走 CPU）
+
+**build.gradle.kts**：加 `testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"` + `androidTestImplementation(androidx.test.ext:junit + runner)`
+
+**跑法**（车机连着）：
+```bash
+adb push tts-adapter/voxcpm2_ptq/dit/dit_float.tflite /sdcard/
+cd agent_front_app && ./gradlew :app:connectedAndroidTest
+adb logcat -s TtsBench
+```
+
+**预期**：`✓✓ DiT 单步 NNAPI/MDLA = Xms`（10步 Euler × 2 CFG ≈ X×20 ms）。或 `❌ create/run 失败`（MDLA JIT 也不支持 RMSNorm/SiLU → 走 CPU 或 op 改写）。
