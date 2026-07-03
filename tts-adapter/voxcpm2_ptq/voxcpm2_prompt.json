@@ -1,0 +1,5 @@
+{
+    "prompt_input": "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n",
+    "prompt_no_input": "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n",
+    "response_split": "<|im_start|>assistant\n"
+}

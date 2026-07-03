@@ -16,6 +16,16 @@ tts-adapter/__pycache__/
 tts-adapter/*.bak
 tts-adapter/voice_samples/
 
+# voxcpm2 PTQ: 大模型权重 + tokenizer 副本 + 中间产物不进 git
+# (同 face-model-not-in-git 惯例；重新生成见 extract_lm_weights.py + PTQ_RESULT.md)
+tts-adapter/voxcpm2_ptq/lm_model/model.safetensors
+tts-adapter/voxcpm2_ptq/lm_model/embedding_fp16.bin
+tts-adapter/voxcpm2_ptq/lm_model/tokenizer*.json
+tts-adapter/voxcpm2_ptq/lm_model/special_tokens_map.json
+tts-adapter/voxcpm2_ptq/logs/
+tflite/
+calibration_datasets/
+
 # IDE / OS
 .claude/
 *.DS_Store
