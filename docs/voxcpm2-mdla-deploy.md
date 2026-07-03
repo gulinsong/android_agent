@@ -30,6 +30,58 @@
 | 主LM | `mtk_llm_sdk` | 自回归 LLM，SDK 有完整 PTQ 流程（make_calib→ptq→fix_shape） |
 | DiT | `mtk_converter.PyTorchConverter` | 非自回归 diffusion，LLM SDK 流程不匹配；通用 TorchScript→tflite |
 
+## 推理流程与端侧集成关键发现（2026-07-03 读 `voxcpm2.py:_inference`）
+
+### 推理是 autoregressive over audio patches（非一次前向）
+
+每次循环产出 1 个 audio patch：
+```
+prefill: feat_encoder(初始feat) → feat_embed; base_lm.embed_tokens(text) → text_embed
+         combined = text_embed + feat_embed; base_lm(combined) → lm_hidden; residual_lm → residual_hidden
+for i in range(max_len):                      # 音频 patch 数（音频长度 × 6.25 Hz）
+    dit_hidden = cat(lm_to_dit_proj(lm_hidden), res_to_dit_proj(residual_hidden))
+    pred_feat = DiT(dit_hidden, noise, t, cond)   # CFM Euler 10 步
+    curr_embed = feat_encoder(pred_feat)          # 编码生成 patch
+    base_lm/residual_lm 前进一步（KV cache）用 curr_embed → 更新 lm_hidden, residual_hidden
+最后: VAE.decode(所有 pred_feat) → 音频
+```
+**端侧算力** = max_len × (base_lm + residual_lm + DiT 10步 + feat_encoder)。10 秒音频 ≈ 62 patch。
+
+### 必需组件清单
+
+| 组件 | 角色 | 工具链 | 状态 |
+|---|---|---|---|
+| base_lm（主LM） | text→hidden，autoregressive | mtk_llm_sdk | ✅（但协议疑点，见下） |
+| residual_lm | 残差 hidden，autoregressive，**no_rope**，无 embed/lm_head | mtk_llm_sdk? | ❌ 协议疑点 |
+| feat_encoder | audio feat→embed，**每步调**，非自回归 transformer | mtk_converter+DiT patch | ✅ float 793MB（复用 DiT patch，cosine 1.0） |
+| DiT | hidden+noise→latent，10步 Euler | mtk_converter | ✅ |
+| VAE decoder | pred_feat→音频波形 | mtk_converter? | ❌ 大坑 |
+| projections | lm_to_dit_proj / res_to_dit_proj / fusion_concat_proj / enc_to_lm_proj（Linear） | 简单 | ❌ 小 |
+
+### ⚠️ base_lm tflite 协议疑点（端侧集成关键阻塞，待解决）
+
+- mtk_llm_sdk 产出 **token-in** tflite（含 `embed_tokens` + `lm_head`，token→embed→layers→logits）
+- VoxCPM2 实际 `base_lm(inputs_embeds=combined_embed)`：combined = `text_embed + feat_embed`（**hidden-in**，外部已 embed，跳过 embed_tokens）
+- **不匹配**：tflite 的 token-in 和实际 hidden-in 用法矛盾
+- 调研（2026-07-03）：mtk_llm_sdk 的 **mllm 路径**（CLIP/InternVL/LLaVA）支持 `image_embed concat text_embed → LLM layers`（即 hidden-in）。make_calib 有 `image_folder`/`extra_input_embeds`/`concat_image_text_embedding`/`DEFAULT_IMAGE_TOKEN`。VoxCPM2 的 combined_embed（text_embed+feat_embed）类比 image_embed，理论上 base_lm 能走 mllm 模式（feat_embed 当 image_embed）。但需 hack vision_config（指向 feat_encoder 或假配置）+ 校准数据含 feat_embed，复杂。**留端侧集成时解决，先转协议清晰的组件（feat_encoder/DiT）**。
+- 当前主LM inference 验证（生成 token）**没覆盖**真实 hidden-in 用法
+
+### residual_lm
+
+73 keys（8 层 MiniCPM，hidden 2048，GQA 2 kv_heads，**no_rope**，无 embed_tokens/lm_head）。hidden-in autoregressive，同 base_lm 协议疑点。`no_rope` 省 RoPE patch。
+
+### VAE decoder 大坑
+
+`audiovae.pth`（312 keys）用 `weight_norm(Conv1d)` + `CausalConv1d`（自定义 padding）+ `Snake1d` 激活（`x+(α+ε)⁻¹·sin(αx)²`）+ 残差单元 + chunk 处理。和 face 标准 CNN（Conv2d+ReLU）完全不同，转换需 fuse weight norm + 处理 snake/causal/chunk，大调试。**可能需 onnxruntime-android 替代（不上 MDLA）**。
+
+### clone vs 非 clone
+
+- **clone**（Controllable/Ultimate Cloning）：输入含参考音频，feat_encoder 编码其 feat → 影响音色。车机固定音色通常用此（预存参考音频）。
+- **非 clone**（Voice Design）：纯文本（可带音色描述），feat 空/占位。
+- **feat_encoder 无论 clone 与否都必需**（每步编码生成 patch 反馈 base_lm，是 autoregressive over patches 的关键）。
+
+---
+
 ## 二、环境准备
 
 ### 2.1 两个 conda 环境
@@ -314,6 +366,18 @@ converter.append_output_dequantize_ops = True
 - ✅ convert 成功（546 ops）
 - ❌ PC 无法跑 tflite：含 MTKEXT op（mtk 优化的 SiLU 等），需 NeuroPilot delegate；`neuron_sdk/mt6991/neuronrt` 是 ARM aarch64（PC x86 跑不了）
 - → **tflite 数值/速度留车机端验证**（NnApiDelegate + mtk-mdla_shim，复用 `FaceEngine.applyAccel` 模式）
+
+---
+
+## 四点五、feat_encoder 转换（复用 DiT patch，2026-07-03）
+
+`VoxCPMLocEnc`（feat_encoder）：audio feat (B,T,P,D) → embed (B,T,hidden)。`in_proj` + `special_token`（CLS-like）+ MiniCPM encoder（**is_causal=False**）。和 DiT decoder 同构（MiniCPM），**DiT 的 RoPE slice + GQA expand patch 直接复用，无新 patch**——验证了 patch 方案对同构 transformer 通用。
+
+**转换**（`convert_feat_enc.py` patch+trace + `convert_feat_enc_api.py` convert）：T=1（每步编码单 patch，最常用），输入 (1,1,4,64)。
+
+**验证**：patch vs orig cosine **1.00000012**（等价）。产出 `feat_encoder.tflite` 793MB（521 ops）。
+
+⚠️ **T 可变**：每步 T=1（编码单 patch），prefill（clone 模式编码参考音频）T=T_init。当前转 T=1 版；prefill 需另转 T=T_init 版或循环 T=1。
 
 ---
 
