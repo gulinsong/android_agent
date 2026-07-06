@@ -488,3 +488,27 @@ adb logcat -s TtsBench
 ```
 
 **预期**：`✓✓ DiT 单步 NNAPI/MDLA = Xms`（10步 Euler × 2 CFG ≈ X×20 ms）。或 `❌ create/run 失败`（MDLA JIT 也不支持 RMSNorm/SiLU → 走 CPU 或 op 改写）。
+
+## 车机 JIT 验证结果（2026-07-06，最终结论）
+
+TtsMdlabenchmark 车机实跑 DiT tflite（JIT NnApiDelegate + CPU 回退），三层结论：
+
+### MDLA 路径：死局（已确认）
+
+patch SiLU（`x/(1+e^-x)` 绕开 `MTKEXT_SILU`）+ RMSNorm（`x*x` 绕开 `MTKEXT_RMS_NORMALIZATION`）后 tflite 无 MTKEXT custom op。但 NnApiDelegate create 仍 **SIGSEGV**（`AddOpsAndTensors NULL op`，fault addr 0x0）——NNAPI 对 RSQRT / 3D TRANSPOSE 等标准 op 部分不支持。ncc-tflite 确认 FC/TRANSPOSE/MEAN/RSQRT/DIV/NEG 全报 float32 MDLA 不支持。
+
+→ **transformer 在 mt6991 MDLA 整体不可行**（face CNN 才能上 MDLA）。
+
+### CPU 路径：车机 NeuroPilot bug + 太慢
+
+- 车机 NeuroPilot XNNPACK create OK（shape 对）但 run **`BufferOverflowException`**（`TensorImpl.copyTo` 写超；输出才 2048 bytes 但 ×16=32KB buffer 仍 overflow）= **车机版 NeuroPilot bug**
+- **PC 同 tflite cosine 1.000000 完美跑通**（输出 (2,64,4)）→ tflite 正确，是车机 NeuroPilot 问题
+- PC CPU 单步 DiT 394ms → 10步 Euler × 2 CFG × ~16 patch（10s 音频）≈ 126s（**RTF ~12**）→ 即使修 NeuroPilot bug，CPU 也太慢
+
+### 最终结论：端侧 VoxCPM2 在 mt6991 不可行
+
+- MDLA 不兼容 transformer（float32 + custom op + NNAPI crash，三重）
+- CPU 太慢（RTF ~12，10s 音频要 ~2 分钟）
+- 车机 NeuroPilot 还有 overflow bug（即使 CPU 也跑不通）
+
+→ **保留 PC 远程 TTS 架构**（车机 HTTP 调 PC GPU VoxCPM2，即 [[stt-tts-deployment]] 现状）；或换更小 TTS 模型；或等车机 MDLA/NeuroPilot SDK 对 transformer 支持成熟。本端侧尝试到此为止，转换工具链（主LM PTQ + DiT/feat_encoder tflite）保留备用。
