@@ -28,6 +28,8 @@ tts-adapter/voxcpm2_ptq/dit/*.pt
 tts-adapter/voxcpm2_ptq/dit/*.onnx
 tts-adapter/voxcpm2_ptq/dit/*.onnx.data
 tts-adapter/voxcpm2_ptq/dit/*.tflite
+tts-adapter/voxcpm2_ptq/dit/*.log
+tts-adapter/voxcpm2_ptq/dit/*.dla
 tflite/
 calibration_datasets/
 responses/
