@@ -6,6 +6,7 @@ mtk/
 # Historical backups
 backup/
 backups/
+agent_front_app.bak/
 
 # BYD map APK + decompiled (539M + 184M, regeneratable)
 docs/byd_map.apk
@@ -29,9 +30,11 @@ tts-adapter/voxcpm2_ptq/dit/*.onnx.data
 tts-adapter/voxcpm2_ptq/dit/*.tflite
 tflite/
 calibration_datasets/
+responses/
 
 # IDE / OS
 .claude/
+.superpowers/
 *.DS_Store
 Thumbs.db
 sample.png
