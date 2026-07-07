@@ -1,7 +1,23 @@
 # VoxCPM2 DiT MDLA 部署进展
 
-> 日期: 2026-07-03
-> 结论: **float tflite 转换成功**，突破了 onnx/mtk_llm_sdk 两死局
+> 日期: 2026-07-03（初），2026-07-06（突破修正）
+> 结论: **DiT 已成功 AOT 编译成 MDLA dla（233MB），端侧可行**，推翻旧"不可行"
+
+## ⭐ 2026-07-06 突破：DiT 成功编译成 MDLA dla
+
+旧结论（float tflite 留车机 NnApiDelegate 验证）走错了路径。正确路径（参考 SD `compile.text_encoder.fp.sh` + `inference/jni/` NeuronRT）：
+
+`dit_quant8w16a_mha_extemb.tflite` (265MB, 8w16a, 659 ops) → `ncc-tflite --arch=mdla5.5,mvpu2.5 --relax-fp32 ...` → **`dit_quant8w16a_mha_extemb.dla` (233MB) ✓ Patch done!**（DRAM MDLA 221M / L1 1.2M）
+
+5 个 patch（`convert_dit_patched.py`，cosine 0.99999994）：①RoPE slice ②SiLU→x/(1+e^-x) ③RMSNorm x*x ④**GQA unfold**（KV repeat 烘焙进 k_proj/v_proj 权重→真 MHA，绕 MTKEXT_TILE 5D rank 限制）⑤**timestep embedding 外部化**（t_emb 作输入，绕 MDLA 不支持的 SIN/COS/MUL）。
+
+关键：**编译用 transformer profile（mdla5.5,mvpu2.5+relax-fp32），不是 unet 的纯 mdla5.5**；执行用 **NeuronRT（libneuron_runtime）加载 .dla，不是 NnApiDelegate/NNAPI**（旧 SIGSEGV 就是用了 NNAPI）。复现：`convert_dit_patched.py`→`convert_dit_ptq.py`→`compile_dit.sh`。详见 `docs/voxcpm2-mdla-deploy.md` 末尾"重大修正"节。
+
+---
+
+## 2026-07-03 初版（float tflite 转换突破，历史保留）
+
+
 
 ## 背景：两死局
 

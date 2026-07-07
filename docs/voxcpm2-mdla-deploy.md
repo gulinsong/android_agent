@@ -512,3 +512,73 @@ patch SiLU（`x/(1+e^-x)` 绕开 `MTKEXT_SILU`）+ RMSNorm（`x*x` 绕开 `MTKEX
 - 车机 NeuroPilot 还有 overflow bug（即使 CPU 也跑不通）
 
 → **保留 PC 远程 TTS 架构**（车机 HTTP 调 PC GPU VoxCPM2，即 [[stt-tts-deployment]] 现状）；或换更小 TTS 模型；或等车机 MDLA/NeuroPilot SDK 对 transformer 支持成熟。本端侧尝试到此为止，转换工具链（主LM PTQ + DiT/feat_encoder tflite）保留备用。
+
+---
+
+## ⭐ 重大修正（2026-07-06 当晚）：上面"端侧不可行"结论是错的，DiT 已成功上 MDLA
+
+复盘发现上面的"最终结论"建立在**两条偏离 SD 官方路径的测试**上，参考 `mtk/GAI-Deployment-Toolkit-v2.0.6_stable-diffusion-v2-1-mlkits-v0.1` 复跑后**彻底推翻**：
+
+### 上面结论为什么错
+
+| 维度 | 上面（错） | SD 官方（对，已验证） |
+|---|---|---|
+| 执行器 | **NNAPI**（NnApiDelegate `mtk-mdla_shim`）→ SIGSEGV | **NeuronRT**（`libneuron_runtime.8.so` 直加载 .dla），SD 完全不用 NNAPI |
+| 模型格式 | .tflite JIT 编译 | **.dla AOT 编译**（ncc-tflite），强制格式 |
+| AOT 编译 flag | **从未真正跑过 ncc-tflite**（仓库零命令/零日志/零 .dla） | SD `compile.unet.sh` 一长串优化 flag |
+| 量化 tflite 新鲜度 | `dit_quant8w16a.tflite` 是 SiLU/RMSNorm patch **之前**的过期产物，仍含 `MTKEXT_RMS_NORMALIZATION/MTKEXT_SILU` | — |
+
+即"发现 3 AOT 失败"是拿**过期 tflite**得出的；"JIT SIGSEGV"是用**错误执行器（NNAPI 而非 NeuronRT）**得出的。SD 验证过的正确路径（PTQ→ncc-tflite AOT dla→NeuronRT JNI）从头到尾没真正试过。
+
+### 正确路径（参考 SD，5 个 patch + transformer 编译 profile，全部跑通）
+
+**SD 的真实执行栈**（读 `inference/jni/` 确认）：`Main.cpp` → `ExecutorFactory` → `NeuronExecutor` → `NeuronRuntimeLibrary` dlopen `libneuron_runtime.8.so` → `NeuronRuntime_loadNetworkFromFile(xxx.dla)` → `NeuronRuntime_inference`。`deviceKind=kEnvOptHardware`、`MDLACoreOption=Dual` 强制 MDLA。零 NNAPI、零 TFLite runtime、零 CPU fallback。三个组件（text_encoder/unet/vae）全是 .dla。
+
+**VoxCPM2 DiT 的 5 个 patch**（`tts-adapter/voxcpm2_ptq/dit/convert_dit_patched.py`），每个都对应 SD 已验证模式，逐个消除 MDLA 不支持的 op：
+
+| # | patch | 解决的 MDLA 报错 | SD 对应 |
+|---|---|---|---|
+| 1 | RoPE `cos_cached[position_ids]`→`[:seq_len]` | aten::index | — |
+| 2 | SiLU `x*sigmoid(x)`→`x/(1+e^-x)` | `MTKEXT_SILU`（mtk_converter 把它识别成 custom op） | — |
+| 3 | RMSNorm `pow(x,2)`→`x*x` | `MTKEXT_RMS_NORMALIZATION` | — |
+| 4 | **GQA unfold**：把 KV repeat 烘焙进 k_proj/v_proj 权重 → 真 MHA | `MTKEXT_TILE` "rank should be in [0,4]"（expand 产生 5D 张量，MDLA 只吃 ≤4D） | SD UNet 是标准 MHA |
+| 5 | **timestep embedding 外部化**：SinusoidalPosEmb 移出模型，t_emb 作输入 | `SIN`/`COS`（MDLA 不支持三角函数）+ 广播 `MUL <2x1>*<1x512>` | SD `pt2tflite.py` 喂 `t_emb` 而非 raw t |
+
+**编译 profile**（关键，别用 unet 的）：transformer 要套 SD `compile.text_encoder.fp.sh`——`--arch=mdla5.5,mvpu2.5`（加 MVPU 跑 RoPE 残留三角函数）+ `--relax-fp32`，不是 unet 的纯 `--arch=mdla5.5`。
+
+### 实测结果（host x86 ncc-tflite 8.2.31，2026-07-06）
+
+```
+dit_quant8w16a_mha_extemb.tflite (265MB, 659 ops, 8w16a)
+  → ncc-tflite --arch=mdla5.5,mvpu2.5 --relax-fp32 ... 
+  → dit_quant8w16a_mha_extemb.dla (233MB) ✓✓✓ Patch done!
+
+DRAM: MDLA 5.5  Static 221M  Code 494K    L1: 1.2M    Total DRAM 221M
+```
+
+**DiT（12 层 MiniCPM transformer）成功 AOT 编译成 MDLA dla**。`MTKEXT_DIV/NEG/FULLY_CONNECTED` 残留但量化后 MDLA 全支持。**transformer 上 MDLA 在 mt6991 可行**，"face CNN 才能上 MDLA"结论作废。
+
+数值保真：5 patch 全程 cosine **0.99999994**（patch 4 GQA unfold + patch 5 timestep 外部化都是精确等价，微小差异来自 patch 2/3 的激活改写）。
+
+### 复现命令
+
+```bash
+cd tts-adapter/voxcpm2_ptq/dit
+# 1. patch + GQA unfold + timestep 外部化 + trace（cosine 自检 0.99999994）
+CUDA_VISIBLE_DEVICES='' /home/tsm/miniconda3/envs/voxcpm2/bin/python convert_dit_patched.py   # → dit_scripted_v4.pt + dit_v4_input_shapes.json
+# 2. PTQ 8w16a（~14 分钟）
+/home/tsm/miniconda3/envs/voxcpm2_ptq/bin/python convert_dit_ptq.py                            # → dit_quant8w16a_mha_extemb.tflite
+# 3. AOT 编译 dla（transformer profile）
+./compile_dit.sh dit_quant8w16a_mha_extemb.tflite                                              # → dit_quant8w16a_mha_extemb.dla ✓
+```
+
+### 还需做的（端侧集成，未开始）
+
+1. **feat_encoder**：和 DiT 同构（MiniCPM），同样的 5 patch 直接复用 → 同样能编译 dla。
+2. **车机 NeuronRT JNI 执行**：复用 SD `inference/jni/` 框架（NeuronExecutor + libneuron_runtime），把 unet 换成 DiT/feat_encoder。**不要再走 NnApiDelegate/NNAPI**——那是上面的错误路径。runtime 时 CPU 预算 t_emb（cat(sin(scale*t*freqs),cos(...))）喂 DiT。
+3. **base_lm / residual_lm**：autoregressive，走 mtk_llm_sdk 自己的 runtime（其 tflite 是 JIT 结构，不能 AOT dla——见前面发现 2）。需另研究。
+4. **VAE**：onnxruntime CPU 或单独处理（6 重坑仍在）。
+5. **端侧测速**：DiT dla 单步 × 10 Euler × 2 CFG，看 RTF 是否达标（MDLA 应远快于 CPU 的 394ms/step）。
+
+**结论修订**：端侧 VoxCPM2 **重新可行**（至少 DiT/feat_encoder 这两个 transformer 组件），剩余是工程集成而非可行性。是否继续投入取决于端侧测速是否达标 vs 现有 PC 远程 TTS 架构。
+
