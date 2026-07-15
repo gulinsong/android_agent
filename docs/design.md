@@ -105,7 +105,7 @@ qqbot 插件内置 STT 支持，可直接处理语音消息。
           "clientSecret": "<QQ_CLIENT_SECRET>",
           "stt": {
             "enabled": true,
-            "baseUrl": "http://172.20.10.5:8090/v1"
+            "baseUrl": "http://172.20.10.2:8090/v1"
           }
         }
       }
@@ -243,13 +243,13 @@ POST /v1/audio/speech
     "provider": "openai",
     "stt": {
       "provider": "openai",
-      "baseUrl": "http://172.20.10.5:8090/v1",
+      "baseUrl": "http://172.20.10.2:8090/v1",
       "model": "whisper-1",
       "language": "zh"
     },
     "tts": {
       "provider": "openai",
-      "baseUrl": "http://172.20.10.5:8091/v1",
+      "baseUrl": "http://172.20.10.2:8091/v1",
       "voice": "zh-CN-XiaoxiaoNeural"
     },
     "speechLocale": "zh-CN",

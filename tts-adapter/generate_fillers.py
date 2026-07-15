@@ -22,7 +22,7 @@ import urllib.request
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", default="http://172.20.10.5:8091")
+    parser.add_argument("--adapter", default="http://172.20.10.2:8091")
     parser.add_argument("--voice", default="default",
                         help="voice id (matches voices.json key)")
     parser.add_argument("--out", required=True,

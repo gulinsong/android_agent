@@ -147,7 +147,7 @@ CarAgent Voice — 仰望车载智能语音助手
 | 车机无 curl/wget | HTTP 请求需通过 node-termux |
 | input text 不支持中文 | Android input 命令限制，需用 AccessibilityService |
 | 网络不稳定 | 车机 WiFi 可能断连，服务需自动重连 |
-| LLM 在开发机 | MiniCPM 运行在开发机 172.20.10.5:8080 |
+| LLM 在开发机 | MiniCPM 运行在开发机 172.20.10.2:8080 |
 
 ---
 

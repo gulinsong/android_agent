@@ -21,7 +21,7 @@
 ```
 PPT 录音
  → sendAudioToGateway(wav)
- → ASR (172.20.10.5:8090)
+ → ASR (172.20.10.2:8090)
  → Gateway (127.0.0.1:18801) 拿 LLM reply
  → POST adapter /v1/audio/speech (同步等)
  → 拿完整 audio bytes
@@ -57,7 +57,7 @@ PPT 录音
 **接口**:
 ```kotlin
 class StreamingTtsPlayer(
-    private val adapterUrl: String,   // http://172.20.10.5:8091
+    private val adapterUrl: String,   // http://172.20.10.2:8091
     private val client: OkHttpClient
 ) {
     fun playStream(

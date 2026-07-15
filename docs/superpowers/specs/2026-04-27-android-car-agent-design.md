@@ -12,7 +12,7 @@
 | Android | 14 (SDK 34), MediaTek, arm64-v8a |
 | RAM/Storage | 10GB / 230GB (226GB free) |
 | Root | No |
-| ADB | Works (USB + WiFi at 172.20.10.4) |
+| ADB | Works (USB + WiFi at 172.20.10.3) |
 | Pre-installed | OpenClaw Android Node v2026.3.11 (`ai.openclaw.app`) + Assistant (`ai.openclaw.assistant`) with AccessibilityService enabled |
 | Input Method | iFlytek (科大讯飞) |
 

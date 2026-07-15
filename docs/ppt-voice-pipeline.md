@@ -19,7 +19,7 @@ PPT按钮按下 → MediaRecorder录音 → FunASR语音识别 → Gateway对话
 
 ### 2. ASR 语音识别
 
-- 端点：`http://172.20.10.5:8090/v1/audio/transcriptions`（FunASR）
+- 端点：`http://172.20.10.2:8090/v1/audio/transcriptions`（FunASR）
 - 输入：M4A 音频文件（`audio/mp4`）
 - 输出：识别文字
 
@@ -31,7 +31,7 @@ PPT按钮按下 → MediaRecorder录音 → FunASR语音识别 → Gateway对话
 
 ### 4. TTS 语音合成
 
-- 端点：`http://172.20.10.5:8091/v1/audio/speech`（TTS 适配器 → VoxCPM2）
+- 端点：`http://172.20.10.2:8091/v1/audio/speech`（TTS 适配器 → VoxCPM2）
 - 输入：Gateway 回复文字
 - 输出：MP3 音频数据
 - 首次请求需热身（VoxCPM2 CUDA Graph 编译约 119s，超时需提前发热身请求）

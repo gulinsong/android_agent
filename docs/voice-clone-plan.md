@@ -5,7 +5,7 @@
 在音色选择中增加"我的音色"选项。用户正常通过飞书语音跟车机对话，STT 端自动保存语音音频作为 TTS 参考音频（ref_audio），实现音色克隆。
 
 **核心约束：**
-- STT (8090)、TTS adapter (8091)、VoxCPM2 (8000) 都在同一台机器 (172.20.10.5)，可共享文件
+- STT (8090)、TTS adapter (8091)、VoxCPM2 (8000) 都在同一台机器 (172.20.10.2)，可共享文件
 - 只保留一条克隆音色，重新录制时覆盖
 - 音频需 3 秒以上才保存
 - **飞书语音格式是 OGG/Opus，不是 WAV** — STT 捕获时需要用 ffmpeg 转成 16kHz 16-bit 单声道 WAV
@@ -70,7 +70,7 @@
 
 **修改：** `app/src/main/java/com/openclaw/car/network/TtsApiClient.kt`
 
-- `enableCloneCapture(): Boolean` — POST STT `/v1/clone/capture`（STT URL: `http://172.20.10.5:8090`）
+- `enableCloneCapture(): Boolean` — POST STT `/v1/clone/capture`（STT URL: `http://172.20.10.2:8090`）
 - `activateCloneVoice(): Boolean` — POST TTS adapter `/v1/clone/activate`
 - `getCloneStatus(): JSONObject?` — GET TTS adapter `/v1/clone/status`
 

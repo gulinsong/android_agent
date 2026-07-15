@@ -7,7 +7,7 @@ Three independent dimensions:
   - Tone/mood: global setting, set by app
 
 Usage:
-    python adapter.py [--voxcpm-url http://172.20.10.5:8000] [--port 8091]
+    python adapter.py [--voxcpm-url http://172.20.10.2:8000] [--port 8091]
 """
 import argparse
 import io
@@ -29,7 +29,7 @@ log = logging.getLogger("tts-adapter")
 
 app = FastAPI()
 
-VOXCPM_URL = "http://172.20.10.5:8000"
+VOXCPM_URL = "http://172.20.10.2:8000"
 VOICE_DIR = os.path.dirname(os.path.abspath(__file__))
 VOICES_FILE = "voices.json"
 SETTINGS_FILE = "settings.json"
@@ -711,7 +711,7 @@ async def generate_fillers(request: Request):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--voxcpm-url", default="http://172.20.10.5:8000")
+    parser.add_argument("--voxcpm-url", default="http://172.20.10.2:8000")
     parser.add_argument("--port", type=int, default=8091)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--voices", default="voices.json")

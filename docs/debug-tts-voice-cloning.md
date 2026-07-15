@@ -168,7 +168,7 @@ adb shell "echo '' > sessions/xxx.jsonl"
 | 全局设置 | `tts-adapter/settings.json` | 方言、语气设置 |
 | 参考音频 | `tts-adapter/voice_samples/sample_*.wav` | 预设声音克隆样本 |
 | 自定义 ref | `tts-adapter/voice_samples/custom_ref.wav` | auto_ref 自动保存 |
-| VoxCPM2 模型服务 | 开发机 `172.20.10.5:8000` | vLLM-Omni 部署 |
+| VoxCPM2 模型服务 | 开发机 `172.20.10.2:8000` | vLLM-Omni 部署 |
 
 ## 数据流（vLLM-Omni，2026-05-19）
 

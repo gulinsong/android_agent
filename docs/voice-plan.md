@@ -7,7 +7,7 @@
 - **语音输入**：车机麦克风（VoiceWake 连续监听 → 后续改为唤醒词）
 - **语音输出**：车机扬声器 TTS 播放
 - **文字通道**：飞书（已有）/ QQ / 微信
-- **LLM**：开发机 MiniCPM-o-4.5 (172.20.10.5:8080)
+- **LLM**：开发机 MiniCPM-o-4.5 (172.20.10.2:8080)
 
 ---
 
@@ -51,8 +51,8 @@ adb shell mkdir -p /data/local/tmp/openclaw-home/.openclaw/workspace/skills/car-
 
 修补 `provider-zai-endpoint-C002s1Qu.js` 和 `model-definitions-DQoIKn0X.js`，将 GLM URL 替换为 MiniCPM API：
 ```
-https://api.z.ai/api/paas/v4 → http://172.20.10.5:8080/v1
-https://open.bigmodel.cn/api/paas/v4 → http://172.20.10.5:8080/v1
+https://api.z.ai/api/paas/v4 → http://172.20.10.2:8080/v1
+https://open.bigmodel.cn/api/paas/v4 → http://172.20.10.2:8080/v1
 ```
 
 ### 1.5 验证
@@ -62,7 +62,7 @@ https://open.bigmodel.cn/api/paas/v4 → http://172.20.10.5:8080/v1
 adb shell "HOME=/data/local/tmp/openclaw-home nohup node-termux openclaw.mjs gateway --port 18801 &"
 
 # 测试 API 连通
-curl http://172.20.10.4:18801/__openclaw__/canvas/ -H "Authorization: Bearer <token>"
+curl http://172.20.10.3:18801/__openclaw__/canvas/ -H "Authorization: Bearer <token>"
 ```
 
 ---
@@ -177,11 +177,11 @@ tinyplay /sdcard/test.wav -D hw:0,0
     "provider": "openai",
     "stt": {
       "provider": "openai",
-      "baseUrl": "http://172.20.10.5:8090/v1"
+      "baseUrl": "http://172.20.10.2:8090/v1"
     },
     "tts": {
       "provider": "openai",
-      "baseUrl": "http://172.20.10.5:8091/v1",
+      "baseUrl": "http://172.20.10.2:8091/v1",
       "voice": "zh-CN-XiaoxiaoNeural"
     },
     "speechLocale": "zh-CN",
@@ -288,7 +288,7 @@ OpenClaw 最新版 (2026.5.7) 内置 Vosk 离线唤醒词检测。
   RAM:       10GB (可用 ~4GB)
   Storage:   230GB (已用 11GB)
   Audio:     ALSA，多路 PCM capture/playback
-  WiFi:      172.20.10.4
+  WiFi:      172.20.10.3
 
 开发机:
   LLM:       MiniCPM-o-4.5 :8080
